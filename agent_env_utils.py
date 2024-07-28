@@ -21,6 +21,7 @@ import numpy as np
 from sapien.core import Pose
 import matplotlib.pyplot as plt
 from mani_skill2.agents.base_agent import BaseAgent
+import os
 
 
 # Register ManiSkill2 environments in gym
@@ -267,11 +268,15 @@ class CustomEnv(PickCubeEnv):
             self.builder = self._scene.create_actor_builder()
         builder = self._scene.create_actor_builder()
         collision_file = f"models/{name}/collision.obj"
+        if(not os.path.exists(collision_file)):
+            collision_file = os.path.join("data/mani_skill2", collision_file)
         scale = np.array([scale/ 0.01887479572529618/2 for _ in range(3)])
         builder.add_multiple_collisions_from_file(
             filename=collision_file, scale=scale/1.1, density=1000
         )
-        visual_file = f"models/{name}/textured.obj" 
+        visual_file = f"models/{name}/textured.obj"
+        if(not os.path.exists(visual_file)):
+            visual_file = os.path.join("data/mani_skill2", visual_file) 
         builder.add_visual_from_file(filename=visual_file, scale=scale)
         # filepath = f"models/{name}/mesh.obj"
         # scale = [scale] #*= self.cube_half_size / 0.01887479572529618 / 3
