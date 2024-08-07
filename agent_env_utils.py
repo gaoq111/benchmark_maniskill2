@@ -58,20 +58,22 @@ from gymnasium import spaces
 from mani_skill2.agents.base_controller import BaseController
 
 
-def save_obs(obs, save_dir, mode="normal"):
-    if(mode=="all"):
-        camera_keys = ["front", "side", "top",]
-    elif(mode == "top"):
-        camera_keys = ["top"]
+def save_obs(obs, save_dir, mode):
+    if mode == "all":
+        camera_keys = obs['image'].keys()
     else:
         camera_keys = ["front"]
-    
+
     for camera_key in camera_keys:
+        try:
+            image_data = obs['image'][camera_key]['rgb']
+            Image.fromarray(image_data.astype(np.uint8)).save(save_dir.split(".png")[0] + f"_{camera_key}.png")
+        except KeyError as e:
+            print(f"KeyError: {e} - Available keys: {obs['image'].keys()}")
+            print(f"Full observation structure: {obs}")
 
-        Image.fromarray((obs['image'][camera_key]['rgb']).astype(np.uint8)).save(save_dir.split(".png")[0] + f"_{camera_key}.png")
-
-def collect_and_save(env, save_dir, steps=1, mode="normal"):
-    for i in range (steps):
+def collect_and_save(env, save_dir, steps, mode):
+    for i in range(steps):
         obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
     save_obs(obs, save_dir, mode=mode)
 
