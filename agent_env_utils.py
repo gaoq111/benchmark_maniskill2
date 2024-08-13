@@ -22,6 +22,7 @@ from sapien.core import Pose
 import matplotlib.pyplot as plt
 from mani_skill2.agents.base_agent import BaseAgent
 import os
+import math
 
 
 # Register ManiSkill2 environments in gym
@@ -57,20 +58,22 @@ from gymnasium import spaces
 from mani_skill2.agents.base_controller import BaseController
 
 
-def save_obs(obs, save_dir, mode="normal"):
-    if(mode=="all"):
-        camera_keys = ["front", "side", "top",]
-    elif(mode == "top"):
-        camera_keys = ["top"]
+def save_obs(obs, save_dir, mode):
+    if mode == "all":
+        camera_keys = obs['image'].keys()
     else:
         camera_keys = ["front"]
-    
+
     for camera_key in camera_keys:
+        try:
+            image_data = obs['image'][camera_key]['rgb']
+            Image.fromarray(image_data.astype(np.uint8)).save(save_dir.split(".png")[0] + f"_{camera_key}.png")
+        except KeyError as e:
+            print(f"KeyError: {e} - Available keys: {obs['image'].keys()}")
+            print(f"Full observation structure: {obs}")
 
-        Image.fromarray((obs['image'][camera_key]['rgb']).astype(np.uint8)).save(save_dir.split(".png")[0] + f"_{camera_key}.png")
-
-def collect_and_save(env, save_dir, steps=1, mode="normal"):
-    for i in range (steps):
+def collect_and_save(env, save_dir, steps, mode):
+    for i in range(steps):
         obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
     save_obs(obs, save_dir, mode=mode)
 
@@ -331,7 +334,7 @@ class CustomEnv(PickCubeEnv):
 
         return cam_cfg
 
-    def _register_cameras(self, background_num=0):
+    def _register_cameras(self, background_num=1):
         pose = look_at([-1, 0, 1], [0, 0, 0])
         cfg1 = CameraConfig(
             "base_camera", pose.p, pose.q, 512, 512, np.pi/3, 0.01, 10
@@ -417,8 +420,7 @@ class CustomEnv(PickCubeEnv):
             self.infos = infos        
         #self.reconfigure()
 
-    def initialize_objects(self, regular=False, background=0):
-        existing_positions = []
+    def initialize_objects(self, regular=False, existing_positions = []):
         # min_dist = 2 * 4 * np.sqrt(2) * env.cube_half_size[-1]
 
         sizes = self.infos['size']
@@ -432,9 +434,7 @@ class CustomEnv(PickCubeEnv):
                 pos_angle = 0
             else:
                 pos_angle = np.random.uniform(-np.pi*2, np.pi*2)
-            pose = [position[0], position[1], sizes[i]*2] +np.array(self.table_centers[background])
-            self.objects[i].set_pose(Pose(pose, 
-                                          euler2quat(0, 0, pos_angle)))
+            self.objects[i].set_pose(Pose([position[0], position[1], sizes[i]*2], euler2quat(0, 0, pos_angle)))
             existing_positions.append(position)
 
 
@@ -597,5 +597,40 @@ class CustomEnv(PickCubeEnv):
             return builder.build_static(name)
         else:
             return builder.build(name)
+        
+def initialize_obj_nooverlap_path(direction, configs, direction_length, env, distance_from_target = 0.2):
+    configs_collate = collate_infos(configs)
+    env.register_configures(configs_collate)
+    _ = env.reset(options={"reconfigure": True})
+
+    env.initialize_objects()
+    obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
+
+    initilization_poses = env.get_important_obj_poses(mode="all")
+        
+    diagonal_move = (direction_length + distance_from_target) / math.sqrt(2)
+    ref_pos = initilization_poses[1]
+    ref_info = np.array([ref_pos.p[0], ref_pos.p[1]])
+    path_info = {
+        "left": np.array([0, (direction_length + distance_from_target)]),
+        "right": np.array([0, -(direction_length + distance_from_target)]),
+        "front": np.array([-(direction_length + distance_from_target), 0]),
+        "behind": np.array([(direction_length + distance_from_target), 0]),
+        "left_front": np.array([- diagonal_move, diagonal_move]),
+        "left_behind": np.array([diagonal_move, diagonal_move]),
+        "right_front": np.array([- diagonal_move, - diagonal_move]),
+        "right_behind": np.array([diagonal_move, - diagonal_move])
+    }
+    #get all position along path at that direction
+    avoid_pos = [[ref_pos.p[0], ref_pos.p[1]]]
+    for i in np.arange(0.01,1,0.01):
+        avoid_pos += [list(ref_info + path_info[direction] * i)]
+        
+    env.initialize_objects(existing_positions = avoid_pos)
+    obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
+    initilization_poses = env.get_important_obj_poses(mode="all")
+    initilization_poses[1] = ref_pos
+        
+    return env, initilization_poses, Pose(list(ref_info + path_info[direction]) + [ref_pos.p[2]], ref_pos.q)
 
 
