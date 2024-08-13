@@ -13,7 +13,7 @@ color_maps = {
     "gray": (0.5, 0.5, 0.5),
 }
 directions = ["front", "behind", "right", "left", "top"]
-
+''''''
 
 
 '''

@@ -9,6 +9,8 @@ __pycache__/
 #Custom files
 data/*
 models/*
+benchmark/*
+*_copy.ipynb
 
 # Distribution / packaging
 .Python
