@@ -12,7 +12,6 @@ from mani_skill2.envs.pick_and_place.base_env import StationaryManipulationEnv
 from mani_skill2.utils.registration import register_env
 import gymnasium as gym
 import sapien.core as sapien
-from mani_skill2 import ASSET_DIR
 from pathlib import Path
 from typing import Dict, List
 from mani_skill2 import format_path
@@ -23,11 +22,12 @@ import matplotlib.pyplot as plt
 from mani_skill2.agents.base_agent import BaseAgent
 import os
 import math
+from collections import defaultdict
+
 
 
 # Register ManiSkill2 environments in gym
 import mani_skill2.envs
-from mani_skill2 import ASSET_DIR
 from mani_skill2.utils.sapien_utils import look_at
 
 
@@ -57,12 +57,16 @@ from collections import OrderedDict
 from gymnasium import spaces
 from mani_skill2.agents.base_controller import BaseController
 
+ASSET_DIR = "/root/maniskill2/data"
+
 
 def save_obs(obs, save_dir, mode):
     if mode == "all":
         camera_keys = obs['image'].keys()
-    else:
+    elif mode == "front":
         camera_keys = ["front"]
+    else:
+        camera_keys = mode
 
     for camera_key in camera_keys:
         try:
@@ -77,15 +81,13 @@ def collect_and_save(env, save_dir, steps, mode):
         obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
     save_obs(obs, save_dir, mode=mode)
 
+
 def collate_infos(info_pairs):
-    infos = {}
+    infos = defaultdict(list)
     for pair in info_pairs:
-        for key in pair:
-            if key not in infos:
-                infos[key] = []
-            infos[key].append(pair[key])
-            
-    return infos
+        for key, value in pair.items():
+            infos[key].append(value)
+    return dict(infos)
 
 
 def is_overlapping(pos1, pos2, min_dist):
@@ -99,7 +101,7 @@ def generate_non_overlapping_position(existing_positions, min_dist, ranges=[(-0.
         # Generate a random position
         new_position = []
         for i in range(len(ranges)):
-            new_position.append(np.random.uniform(low=ranges[i][0], high=ranges[i][1], size=(1))[0])
+            new_position.append(np.random.uniform(low=min(ranges[i]), high=max(ranges[i]), size=1)[0])
         # Check for overlap with existing positions
         overlap = any(is_overlapping(new_position, pos, min_dist) for pos in existing_positions)
         if not overlap:
@@ -270,12 +272,12 @@ class CustomEnv(PickCubeEnv):
         if(self.builder is None):
             self.builder = self._scene.create_actor_builder()
         builder = self._scene.create_actor_builder()
-        collision_file = f"models/{name}/collision.obj"
+        collision_file = f"{ASSET_DIR}/mani_skill2_ycb/models/{name}/collision.obj"
         scale = np.array([scale/ 0.01887479572529618/2 for _ in range(3)])
         builder.add_multiple_collisions_from_file(
-            filename=collision_file, scale=scale/1.1, density=1000
+            filename=collision_file, scale=scale/1.2, density=1000
         )
-        visual_file = f"models/{name}/textured.obj" 
+        visual_file = f"{ASSET_DIR}/mani_skill2_ycb/models/{name}/textured.obj" 
         builder.add_visual_from_file(filename=visual_file, scale=scale)
         # filepath = f"models/{name}/mesh.obj"
         # scale = [scale] #*= self.cube_half_size / 0.01887479572529618 / 3
@@ -341,8 +343,8 @@ class CustomEnv(PickCubeEnv):
         #cam_cfg.p = [1.00000001e+00, 5.96046446e-09, 6.05000012e-01]
 
         ### Only table
-        table_center = [0.70000001-0.7, 0.40000001-0.39, -0.05]
-        table_center2 = [4.4, -2.88,  0.15]
+        table_center = [0.70000001-0.7, 0.40000001-0.39, 0]
+        table_center2 = [4.4, -2.88,  0.2]
         table_center3 = [5.95,  1.815, -0.15]
         table_center4 = [4.1, 1.41, -0.72]
         fsp_points = {
@@ -362,7 +364,7 @@ class CustomEnv(PickCubeEnv):
         }
         fsp_points4 = {
             "front": [4, 0, -0.3],
-            "side": [5.8, 1.41, -0.3],
+            "side": [5.2, 1.5, -0.25],
             "top": [4, 0, 0.805],
         }
         table_sets = [(table_center, fsp_points), (table_center2, fsp_points2), (table_center3, fsp_points3), (table_center4, fsp_points4)]
@@ -416,13 +418,15 @@ class CustomEnv(PickCubeEnv):
             self.infos = infos        
         #self.reconfigure()
 
-    def initialize_objects(self, regular=False, existing_positions = []):
+    def initialize_objects(self, regular=False, existing_positions = [], background=0):
         # min_dist = 2 * 4 * np.sqrt(2) * env.cube_half_size[-1]
 
         sizes = self.infos['size']
         ranges = self.infos['ranges']
 
         min_dist = 2*max(sizes) * np.sqrt(2)
+        table_center = self.table_centers[background]
+        self.background = background
 
         for i in range(len(sizes)):
             position = generate_non_overlapping_position(existing_positions, min_dist, ranges=ranges[i])
@@ -430,9 +434,33 @@ class CustomEnv(PickCubeEnv):
                 pos_angle = 0
             else:
                 pos_angle = np.random.uniform(-np.pi*2, np.pi*2)
-            self.objects[i].set_pose(Pose([position[0], position[1], sizes[i]*2], euler2quat(0, 0, pos_angle)))
+            self.objects[i].set_pose(Pose([position[0]+table_center[0], position[1]+table_center[1], sizes[i]*2+table_center[2]], euler2quat(0, 0, pos_angle)))
             existing_positions.append(position)
 
+    def spawn_next(self, place_info, distance=None):
+        sizes = self.infos['size']
+        move_obj, ref_obj, direction = place_info
+        if(distance is None):
+            distance = (sizes[move_obj] + sizes[ref_obj]) * np.sqrt(2)
+
+        pose_obj_ref = self.objects[ref_obj].get_pose()
+
+
+        if(len(direction.split("_")) == 1):
+            ### simple direction here
+            new_position = [dp*distance for dp in self.direction_placement_map[direction]]
+        else:
+            ### complex direction here
+            directions = direction.split("_")
+            new_position = sum([np.array(self.direction_placement_map[direction])*distance/len(directions) for direction in directions]).tolist()
+
+        new_position = [pair[0]+pair[1] for pair in zip(pose_obj_ref.p, new_position)]
+        
+        #change the height of the object
+        #new_position[2] = sizes[move_obj]*2 + self.table_centers[self.background][2]
+        
+                
+        self.objects[move_obj].set_pose(Pose(new_position, self.objects[move_obj].get_pose().q))
 
     def place_cubes_in_direction(self, place_infos, distances=[]):
         sizes = self.infos['size']
@@ -443,7 +471,7 @@ class CustomEnv(PickCubeEnv):
             if(len(distances) > i):
                 distance = distances[i]
             else:
-                distance = (sizes[move_obj] + sizes[ref_obj]) * np.sqrt(2)
+                distance = (sizes[move_obj] + sizes[ref_obj]) * np.sqrt(2)*1.2
 
             pose_obj_ref = self.objects[ref_obj].get_pose()
 
