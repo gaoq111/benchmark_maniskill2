@@ -198,6 +198,7 @@ class CustomEnv(PickCubeEnv):
         self.objects = []
         self.infos = {'size': [0.1, 0.1], 'color': [(1, 0, 0), (0, 1, 0)], 'obj_type': ["sphere", "sphere"], 'static': [True, True]}
         self.builder = None
+
         self.direction_placement_map = {
             "behind": [-1, 0, 0],
             "front": [1, 0, 0],
@@ -358,14 +359,14 @@ class CustomEnv(PickCubeEnv):
             "top": [5.2, -2.9,  1],
         }
         fsp_points3 = {
-            "front": [5.3, 1.81, 0.1],
-            "side": [5.9, 0.5, 0.1],
+            "side": [5.3, 1.81, 0.1],
+            "front": [5.9, 0.5, 0.1],
             "top": [5.5, 1.81, 0.6],
         }
         fsp_points4 = {
             "front": [4, 0, -0.3],
             "side": [5.2, 1.5, -0.25],
-            "top": [4, 0, 0.805],
+            "top": [4, 1.5, 0.805],
         }
         table_sets = [(table_center, fsp_points), (table_center2, fsp_points2), (table_center3, fsp_points3), (table_center4, fsp_points4)]
 
@@ -541,7 +542,10 @@ class CustomEnv(PickCubeEnv):
 
     def move_in_directions(self, instructions, distances, steps=None, scale=1, camera_view="all", background=0):
         frames = {}
-        views = [f"front{background}", f"side{background}", f"top{background}"]
+        views = (
+        [f"side{background}", f"front{background}", f"top{background}"]
+        if background == 3 else
+        [f"front{background}", f"side{background}", f"top{background}"])
         if(camera_view == "all"):
             for view in views:
                 frames[view] = []
