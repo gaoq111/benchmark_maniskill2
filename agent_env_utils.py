@@ -366,7 +366,7 @@ class CustomEnv(PickCubeEnv):
         fsp_points4 = {
             "front": [4, 0, -0.3],
             "side": [5.2, 1.5, -0.25],
-            "top": [4, 1.5, 0.805],
+            "top": [4, 1.42, 0.805],
         }
         table_sets = [(table_center, fsp_points), (table_center2, fsp_points2), (table_center3, fsp_points3), (table_center4, fsp_points4)]
 
