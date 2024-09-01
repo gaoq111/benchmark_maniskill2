@@ -359,8 +359,8 @@ class CustomEnv(PickCubeEnv):
             "top": [5.2, -2.9,  1],
         }
         fsp_points3 = {
-            "side": [5.3, 1.81, 0.1],
-            "front": [5.9, 0.5, 0.1],
+            "front": [5.3, 1.81, 0.1],
+            "side": [5.9, 0.5, 0.1],
             "top": [5.5, 1.81, 0.6],
         }
         fsp_points4 = {
