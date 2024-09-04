@@ -23,7 +23,7 @@ def create_config(obj_type, color, size, position_range, static=True, name=None)
         config['name'] = name
     return config
 
-def finalize_quadrant(quadrant, scale=1, num_divisions=4):
+def finalize_quadrant_specific(quadrant, scale=1, num_divisions=4):
     lim_x, lim_y = quadrant
     
     # Divide the quadrant into a grid
@@ -40,10 +40,29 @@ def finalize_quadrant(quadrant, scale=1, num_divisions=4):
     
     x_range.sort()
     y_range.sort()
-    interval_x = np.array(x_range)*scale
-    interval_y = np.array(y_range)*scale
+    interval_x = np.array(x_range)
+    interval_y = np.array(y_range)
     return interval_x, interval_y
 
-def get_random_position(background_quadrants, background, scale=0.6):
+def finalize_quadrant(quadrant, scale=1, num_divisions=4):
+    lim_x, lim_y = quadrant
+    
+    # Divide the quadrant into a grid
+    x_step = lim_x * scale
+    y_step = lim_y * scale
+    
+    
+    # Calculate the range for the chosen cell
+    x_range = [x_step, 0]
+    y_range = [y_step, 0]
+    
+    x_range.sort()
+    y_range.sort()
+    interval_x = np.array(x_range)
+    interval_y = np.array(y_range)
+    return interval_x, interval_y
+
+def get_position_range(background_quadrants, background, scale=0.6):
     quadrant = random.choice(background_quadrants[background])
+    
     return finalize_quadrant(quadrant, scale=scale)

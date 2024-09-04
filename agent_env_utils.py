@@ -542,12 +542,12 @@ class CustomEnv(PickCubeEnv):
 
     def move_in_directions(self, instructions, distances, steps=None, scale=1, camera_view="all", background=0):
         frames = {}
-        views = [f"front{background}", f"side{background}", f"top{background}"]
         if(camera_view == "all"):
-            for view in views:
-                frames[view] = []
+            views = [f"front{background}", f"side{background}", f"top{background}"]
         else:
-            frames[camera_view] = []
+            views = [camera_view] if type(camera_view) is not list else camera_view
+        for view in views:
+            frames[view] = []
 
         if(type(instructions[0]) is not list and type(instructions[0]) is not tuple):
             instructions = [instructions]
@@ -575,21 +575,18 @@ class CustomEnv(PickCubeEnv):
                 else:  
                     self.place_cubes_in_direction(direction_info, distances=[step])
                 obs, _, _, _, _ = self.step(np.zeros(len(self.action_space.sample())))
-                if(camera_view == "all"):
-                    for view in views:
-                        frames[view].append(obs['image'][view]['Color'])
-                else:
-                    frames[camera_view].append(obs['image'][camera_view]['Color'])
+                for view in views:
+                    frames[view].append(obs['image'][view]['Color'])
 
         #print("Final position :")
         #print(self.obj.get_pose())
 
             # Save frames as GIF
             #imageio.mimsave('move_one_direction.gif', frames, duration=0.03)  # Set duration between frames (in seconds)
-        if(camera_view != "all"):
-            return frames[camera_view]
-        return frames
-
+        
+        output_frames = {view: frames[view] for view in views}
+        return output_frames
+    
     def get_important_obj_poses(self, mode="normal"):
         if(mode == "all"):
             return [obj.get_pose() for obj in self.objects]
@@ -623,6 +620,8 @@ class CustomEnv(PickCubeEnv):
         else:
             return builder.build(name)
         
+#generate a path that avoid the ref obj
+# mainly used for one moving obj and one static (reference) obj
 def initialize_obj_nooverlap_path(direction, configs, direction_length, env, distance_from_target = 0.2):
     configs_collate = collate_infos(configs)
     env.register_configures(configs_collate)
@@ -634,8 +633,8 @@ def initialize_obj_nooverlap_path(direction, configs, direction_length, env, dis
     initilization_poses = env.get_important_obj_poses(mode="all")
         
     diagonal_move = (direction_length + distance_from_target) / math.sqrt(2)
-    ref_pos = initilization_poses[1]
-    ref_info = np.array([ref_pos.p[0], ref_pos.p[1]])
+    mov_pos = initilization_poses[0]
+    mov_info = np.array([mov_pos.p[0], mov_pos.p[1]])
     path_info = {
         "left": np.array([0, (direction_length + distance_from_target)]),
         "right": np.array([0, -(direction_length + distance_from_target)]),
@@ -647,15 +646,19 @@ def initialize_obj_nooverlap_path(direction, configs, direction_length, env, dis
         "right_behind": np.array([diagonal_move, - diagonal_move])
     }
     #get all position along path at that direction
-    avoid_pos = [[ref_pos.p[0], ref_pos.p[1]]]
+    avoid_pos = [list(mov_info)]
     for i in np.arange(0.01,1,0.01):
-        avoid_pos += [list(ref_info + path_info[direction] * i)]
+        avoid_pos.append(list(mov_info - path_info[direction] * i))
+        
+    ref_pos = Pose(list(mov_info - path_info[direction]) + [mov_pos.p[2]], mov_pos.q)
+        
+    # avoid_pos = []
         
     env.initialize_objects(existing_positions = avoid_pos)
     obs, _, _, _, _ = env.step(np.zeros(len(env.action_space.sample())))
     initilization_poses = env.get_important_obj_poses(mode="all")
-    initilization_poses[1] = ref_pos
+    #initilization_poses[1] = ref_pos
         
-    return env, initilization_poses, Pose(list(ref_info + path_info[direction]) + [ref_pos.p[2]], ref_pos.q)
+    return initilization_poses, mov_pos, ref_pos
 
 
