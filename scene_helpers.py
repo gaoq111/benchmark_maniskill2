@@ -44,7 +44,7 @@ def finalize_quadrant_specific(quadrant, scale=1, num_divisions=4):
     interval_y = np.array(y_range)
     return interval_x, interval_y
 
-def finalize_quadrant(quadrant, scale=1, num_divisions=4):
+def finalize_quadrant(quadrant, scale=1):
     lim_x, lim_y = quadrant
     
     # Divide the quadrant into a grid

@@ -109,6 +109,26 @@ def generate_non_overlapping_position(existing_positions, min_dist, ranges=[(-0.
         t += 1
 
     return new_position
+
+def generate_multiple_non_overlapping_positions(num_objects, min_dist, ranges=[(-0.3, 0.3), (-0.3, 0.3)], existing_positions=[], max_attempts=5):
+    positions = existing_positions.copy()
+    attempts = 0
+
+    while len(positions) < len(existing_positions) + num_objects and attempts < max_attempts:
+        new_position = generate_non_overlapping_position(positions, min_dist, ranges)
+        
+        # Check if the new position overlaps with any existing positions
+        if len(new_position) == len(ranges):
+            positions.append(new_position)
+            attempts = 0  # Reset attempts counter on successful placement
+        else:
+            attempts += 1
+
+    if len(positions) < len(existing_positions) + num_objects:
+        print(f"Warning: Could only generate {len(positions) - len(existing_positions)} new non-overlapping positions out of {num_objects} requested.")
+
+    # Return only the newly generated positions
+    return positions[len(existing_positions):]
         
 def check_move(pos1, pos2, threshold=0.3):
     return np.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2 + (pos1[2] - pos2[2])**2) >= threshold
@@ -346,7 +366,7 @@ class CustomEnv(PickCubeEnv):
         ### Only table
         table_center = [0.70000001-0.7, 0.40000001-0.39, 0]
         table_center2 = [4.4, -2.88,  0.2]
-        table_center3 = [5.95,  1.815, -0.15]
+        table_center3 = [5.95,  1.815, -0.125]
         table_center4 = [4.1, 1.41, -0.72]
         fsp_points = {
             "front": [0.8, 5.96046446e-09+0.03, 6.05000012e-01-0.3],
@@ -426,6 +446,7 @@ class CustomEnv(PickCubeEnv):
         ranges = self.infos['ranges']
 
         min_dist = 2*max(sizes) * np.sqrt(2)
+        
         table_center = self.table_centers[background]
         self.background = background
 
@@ -435,7 +456,7 @@ class CustomEnv(PickCubeEnv):
                 pos_angle = 0
             else:
                 pos_angle = np.random.uniform(-np.pi*2, np.pi*2)
-            self.objects[i].set_pose(Pose([position[0]+table_center[0], position[1]+table_center[1], sizes[i]*2+table_center[2]], euler2quat(0, 0, pos_angle)))
+            self.objects[i].set_pose(Pose([position[0]+table_center[0], position[1]+table_center[1], sizes[i]+table_center[2]], euler2quat(0, 0, pos_angle)))
             existing_positions.append(position)
 
     def spawn_next(self, place_info, distance=None):

@@ -178,9 +178,12 @@ def display_images_inVideo(images: List[np.ndarray], dpi=100.0, format="html5_vi
 
 def save_image(info):
     image, path = info
-    if(type(image) is not Image.Image):
-        image = Image.fromarray((image* 255).astype(np.uint8))
-    if(os.path.exists(path)):
+    if isinstance(image, str):
+        print(f"Error: Expected image data but got a string: {image}")
+        return
+    if not isinstance(image, Image.Image):
+        image = Image.fromarray((image * 255).astype(np.uint8))  # Ensure image is not a string here
+    if os.path.exists(path):
         return
     image.save(path)
 
