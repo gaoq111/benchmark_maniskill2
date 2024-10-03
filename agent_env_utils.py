@@ -97,7 +97,7 @@ def is_overlapping(pos1, pos2, min_dist):
 
 def generate_non_overlapping_position(existing_positions, min_dist, ranges=[(-0.3, 0.3), (-0.3, 0.3)]):
     t = 0
-    while True and t < 5:
+    while True and t < 10:
         # Generate a random position
         new_position = []
         for i in range(len(ranges)):
@@ -107,7 +107,6 @@ def generate_non_overlapping_position(existing_positions, min_dist, ranges=[(-0.
         if not overlap:
             return new_position
         t += 1
-
     return new_position
 
 def generate_multiple_non_overlapping_positions(num_objects, min_dist, ranges=[(-0.3, 0.3), (-0.3, 0.3)], existing_positions=[], max_attempts=5):
@@ -441,11 +440,12 @@ class CustomEnv(PickCubeEnv):
 
     def initialize_objects(self, regular=False, existing_positions = [], background=0):
         # min_dist = 2 * 4 * np.sqrt(2) * env.cube_half_size[-1]
-
+        existing_positions = []
         sizes = self.infos['size']
         ranges = self.infos['ranges']
 
-        min_dist = 2*max(sizes) * np.sqrt(2)
+        min_dist = 2 *max(sizes) * np.sqrt(2)
+
         
         table_center = self.table_centers[background]
         self.background = background
